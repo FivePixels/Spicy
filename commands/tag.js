@@ -66,34 +66,51 @@ module.exports = {
         ,
 	async execute(interaction) {
         await interaction.deferReply();
+        const responseEmbed = new EmbedBuilder();
         const subcommand = interaction.options.subcommand;
         const name = interaction.options.getString('name');
+        const content = interaction.options.getString('content');
+        const attachment = interaction.options.getAttachment('attachment');
         const Tag = mongoose.model('Tag', tagSchema);
         switch (subcommand) {
             case "delete":
                 deleteTag(name);
                 break;
             case "edit":
+                updateTag(name);
+                break;
             default: // create
-                const content = interaction.options.getString('content');
-                const attachment = interaction.options.getAttachment('attachment');
-                upsertTag(name, content, attachment);
+                createTag(name, content, attachment);
                 break;
         }
 
-        function deleteTag(name) {
-            Tag.deleteOne(
+        function createTag(name, content, attachment) {
+            const attachUrl = attachment == null ? null : attachment.url;
+            const res = Tag.updateOne(
                 {
                     name: name
+                },
+                {
+                    $set: {
+                        content: content,
+                        attachmentURL: attachUrl
+                    }
+                },
+                {
+                    upsert: false
                 }
-           )
+                );
+            responseEmbed.setTitle("Tag created");
+            responseEmbed.setDescription("The " + name + " tag was created successfully.");
+            interaction.reply({embeds: [responseEmbed]});
         }
 
-        function upsertTag(name, content, attachment) {
-            // update/insert tag
-            // after rereading this logic, we probably wont want upsert logic, since create and edit are two separate commands
+        function deleteTag(name) {
+            Tag.deleteOne({ name: name });
+        }
+
+        function updateTag(name, content, attachment) {
             const attachUrl = attachment == null ? null : attachment.url;
-            const responseEmbed = new EmbedBuilder();
             const res = Tag.updateOne(
                 {
                     name: name
@@ -108,14 +125,8 @@ module.exports = {
                     upsert: true
                 }
             )
-            if (res.modifiedCount > 0) {
-                responseEmbed.setTitle("Tag updated")
-                responseEmbed.setDescription("The " + name + " tag was created successfully.")
-            } else {
-                responseEmbed.setTitle("Tag created")
-                responseEmbed.setDescription("The " + name + " tag was updated successfully.")
-            }
-            console.log('made it here')
+            responseEmbed.setTitle("Tag updated");
+            responseEmbed.setDescription("The " + name + " tag was updated successfully.");
             interaction.reply({embeds: [responseEmbed]});
         }
 	},

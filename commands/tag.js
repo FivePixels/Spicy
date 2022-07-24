@@ -4,68 +4,83 @@ const { default: mongoose } = require('mongoose');
 const { tagSchema } = require('../database/schema/Tag.js');
 module.exports = {
 	data: new SlashCommandBuilder()
-		.setName('tag')
-		.setDescription('Commands related to tagging')
-        .addSubcommand(subcommand => {
-            return subcommand
-            .setName("create")
-            .setDescription("Create a new tag")
-            .addStringOption(option => {
-                return option
+        .setName('tag')
+        .setDescription('Create and reuse embedded "tags"')
+        .addStringOption((option)=> 
+            option
                 .setName("name")
                 .setDescription("The name of the tag")
-                .setRequired(true);
-            })
-            .addStringOption(option => {
-                return option
-                .setName("content")
-                .setDescription("The content of the tag")
-                .setRequired(true);
-            })
-            .addAttachmentOption(option => {
-                return option
-                .setName("attachment")
-                .setDescription("The attachment of the tag")
-                .setRequired(false);
-            })
-        })
-        .addSubcommand(subcommand => {
-            return subcommand
-            .setName("delete")
-            .setDescription("Delete a tag")
-            .addStringOption(option => {
-                return option
-                .setName("name")
-                .setDescription("The name of the tag")
-                .setRequired(true);
-            })
-        })
-        .addSubcommand(subcommand => {
-            return subcommand
-            .setName("edit")
-            .setDescription("Edit an existing tag")
-            .addStringOption(option => {
-                return option
-                .setName("name")
-                .setDescription("The name of the tag")
-                .setRequired(true);
-            })
-            .addStringOption(option => {
-                return option
-                .setName("content")
-                .setDescription("The content of the tag")
-                .setRequired(true);
-            })
-            .addAttachmentOption(option => {
-                return option
-                .setName("attachment")
-                .setDescription("The attachment of the tag")
-                .setRequired(false);
-            })
-        })
-        ,
+                .setRequired(false)
+        )
+        .addSubcommandGroup((group) => 
+            group 
+                .setName("tag")
+                .setDescription("blah")
+            .addSubcommand((create) => 
+                 create
+                .setName('create')
+                .setDescription('Creates a new tag.')
+                .addStringOption((option) => 
+                    option
+                        .setName("name")
+                        .setDescription("That name of the tag.")
+                        .setRequired(true)
+                )
+        
+                .addStringOption((option) =>
+                     option
+                        .setName("content")
+                        .setDescription("The content of the tag.")
+                        .setRequired(true)
+                )
+                .addAttachmentOption((option) => 
+                     option
+                        .setName("attachment")
+                        .setDescription("The attachment of the tag.")
+                        .setRequired(false)
+                )
+            )
+            .addSubcommand((del) =>
+                del
+                .setName('delete')
+                .setDescription('Deletes a tag.')
+                .addStringOption((option) =>
+                    option
+                        .setName("name")
+                        .setDescription("The name of the tag.")
+                        .setRequired(true)
+                )
+            )
+            .addSubcommand((edit) =>
+                edit
+                .setName('edit')
+                .setDescription('Edits a tag.')
+                .addStringOption((option) =>
+                    option
+                        .setName("name")
+                        .setDescription("The name of the tag.")
+                        .setRequired(true)
+                )
+                .addStringOption((option) =>
+
+                    option
+
+                        .setName("content")
+                        .setDescription("The content of the tag.")
+                        .setRequired(true)
+                )
+                .addAttachmentOption((option) =>
+                    option
+                        .setName("attachment")
+                        .setDescription("The attachment of the tag.")
+                        .setRequired(false)
+                )
+            )
+        ),
+                // my output doesn't auto scroll this is annoying
+
+        
 	async execute(interaction) {
-        await interaction.deferReply();
         const responseEmbed = new EmbedBuilder();
         const subcommand = interaction.options.subcommand;
         const name = interaction.options.getString('name');
@@ -74,19 +89,22 @@ module.exports = {
         const Tag = mongoose.model('Tag', tagSchema);
         switch (subcommand) {
             case "delete":
-                deleteTag(name);
+                await deleteTag(name);
                 break;
             case "edit":
-                updateTag(name);
+                await updateTag(name, content, attachment);
                 break;
-            default: // create
-                createTag(name, content, attachment);
+            case "create":
+                await createTag(name, content, attachment);
+                break;
+            default:
+                await sendTag(name);
                 break;
         }
 
-        function createTag(name, content, attachment) {
+        async function createTag(name, content, attachment) {
             const attachUrl = attachment == null ? null : attachment.url;
-            const res = Tag.updateOne(
+             Tag.updateOne(
                 {
                     name: name
                 },
@@ -105,13 +123,13 @@ module.exports = {
             interaction.reply({embeds: [responseEmbed]});
         }
 
-        function deleteTag(name) {
+        async function deleteTag(name) {
             Tag.deleteOne({ name: name });
         }
 
-        function updateTag(name, content, attachment) {
+        async function updateTag(name, content, attachment) {
             const attachUrl = attachment == null ? null : attachment.url;
-            const res = Tag.updateOne(
+            Tag.updateOne(
                 {
                     name: name
                 },
@@ -129,5 +147,28 @@ module.exports = {
             responseEmbed.setDescription("The " + name + " tag was updated successfully.");
             interaction.reply({embeds: [responseEmbed]});
         }
+
+        async function sendTag(name) {
+            const Tag = mongoose.model('Tag', tagSchema);
+            Tag.findOne({ name: name }, function (err, tag) {
+                if (err) {
+                    console.log(err);
+                } else {
+                    if (tag == null) {
+                        interaction.reply("Tag not found");
+                    } else {
+                        const embed = new EmbedBuilder();
+                        embed.setTitle(tag.name);
+                        embed.setDescription(tag.content);
+                        if (tag.attachmentURL != null) {
+                            embed.setImage(tag.attachmentURL);
+                        }
+                        interaction.reply({ embeds: [embed] });
+                    }
+                }
+            }
+            )
+        }
 	},
+
 };
